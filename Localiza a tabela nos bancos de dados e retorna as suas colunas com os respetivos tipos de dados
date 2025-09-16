@@ -1,0 +1,153 @@
+-- Localiza a tabela nos bancos de dados e retorna as suas colunas com os respetivos tipos de dados
+
+-- Substitua pelo texto que você quer encontrar nos nomes das tabelas
+DECLARE @ProcuraTabela NVARCHAR(128) = '_PD_';
+
+-- Constrói o SQL dinamicamente para cada banco com UNION ALL
+DECLARE @SQL NVARCHAR(MAX) = '';
+
+SELECT @SQL = @SQL + 
+    CASE 
+        WHEN @SQL = '' THEN '' 
+        ELSE ' UNION ALL ' 
+    END +
+    'SELECT ' +
+        '''' + name + ''' AS DATABASE_NAME, ' +
+        'c.TABLE_NAME, ' +
+        't.TABLE_TYPE, ' +
+        'c.COLUMN_NAME, ' +
+        'c.DATA_TYPE, ' +
+        'c.CHARACTER_MAXIMUM_LENGTH, ' +
+        'c.NUMERIC_PRECISION, ' +
+        'c.NUMERIC_SCALE, ' +
+        'c.IS_NULLABLE, ' +
+        'c.COLUMN_DEFAULT, ' +
+        'c.ORDINAL_POSITION ' +
+    'FROM [' + name + '].INFORMATION_SCHEMA.COLUMNS c ' +
+    'INNER JOIN [' + name + '].INFORMATION_SCHEMA.TABLES t ON c.TABLE_NAME = t.TABLE_NAME ' +
+    'WHERE UPPER(c.TABLE_NAME) LIKE UPPER(''%' + @ProcuraTabela + '%'')'
+FROM sys.databases 
+WHERE state = 0 
+  AND database_id > 4 
+  AND HAS_DBACCESS(name) = 1;
+
+-- Adiciona ordenação final
+IF @SQL <> ''
+    SET @SQL = @SQL + ' ORDER BY DATABASE_NAME, TABLE_NAME, ORDINAL_POSITION;';
+
+-- Executa apenas se houver bancos para consultar
+IF @SQL <> ''
+    EXEC sp_executesql @SQL
+ELSE
+    PRINT 'Nenhum banco acessível encontrado.';
+
+
+
+
+
+/* 
+
+🎯 Objetivo e Explicação do Código:
+
+Este código procura todas as tabelas que contenham a palavra "ESTRUTURA" no nome e lista todas as colunas dessas tabelas, unificando o resultado em uma única consulta.
+📝 Explicação Passo a Passo:
+
+1. Declaração das Variáveis
+DECLARE @ProcuraTabela NVARCHAR(128) = 'ESTRUTURA';
+DECLARE @SQL NVARCHAR(MAX) = '';
+O que faz:
+
+@ProcuraTabela: Armazena o texto a ser procurado nos nomes das tabelas
+@SQL: Vai acumular todo o comando SQL que será construído dinamicamente
+Exemplo: Vai encontrar tabelas como TB_ESTRUTURA_CAIXA, DM_ESTRUTURA_HIST, etc.
+
+2. Construção Dinâmica com UNION ALL
+SELECT @SQL = @SQL + 
+    CASE 
+        WHEN @SQL = '' THEN '' 
+        ELSE ' UNION ALL ' 
+    END +
+Lógica do CASE:
+
+Se @SQL está vazio (primeiro banco): Não adiciona "UNION ALL"
+Se @SQL já tem conteúdo (demais bancos): Adiciona "UNION ALL" antes do SELECT
+
+Resultado prático:
+-- Banco 1: SELECT...
+-- Banco 2: UNION ALL SELECT...
+-- Banco 3: UNION ALL SELECT...
+
+3. Construção do SELECT com JOIN
+'SELECT ' +
+    '''' + name + ''' AS DATABASE_NAME, ' +
+    'c.TABLE_NAME, ' +
+    't.TABLE_TYPE, ' +
+    'c.COLUMN_NAME, ' +
+    'c.DATA_TYPE, ' +
+    'c.CHARACTER_MAXIMUM_LENGTH, ' +
+    'c.NUMERIC_PRECISION, ' +
+    'c.NUMERIC_SCALE, ' +
+    'c.IS_NULLABLE, ' +
+    'c.COLUMN_DEFAULT, ' +
+    'c.ORDINAL_POSITION ' +
+'FROM [' + name + '].INFORMATION_SCHEMA.COLUMNS c ' +
+'INNER JOIN [' + name + '].INFORMATION_SCHEMA.TABLES t ON c.TABLE_NAME = t.TABLE_NAME ' +
+Detalhamento:
+
+'''' + name + ''' AS DATABASE_NAME:
+
+Converte o nome do banco em string literal
+Ex: Se name = 'DMD47', vira 'DMD47' AS DATABASE_NAME
+
+
+FROM [' + name + '].INFORMATION_SCHEMA.COLUMNS c:
+
+Referência direta ao banco: FROM [DMD47].INFORMATION_SCHEMA.COLUMNS c
+Alias c para facilitar referências
+
+
+INNER JOIN ... t ON c.TABLE_NAME = t.TABLE_NAME:
+
+Liga as informações de colunas (c) com informações de tabelas (t)
+Obtém o TABLE_TYPE (se é tabela ou view)
+
+4. Filtro de Busca Case-Insensitive
+'WHERE UPPER(c.TABLE_NAME) LIKE UPPER(''%' + @ProcuraTabela + '%'')'
+Como funciona:
+
+UPPER(c.TABLE_NAME): Converte nome da tabela para maiúscula
+UPPER(''%' + @ProcuraTabela + '%''): Converte o filtro para maiúscula
+%ESTRUTURA%: Busca "ESTRUTURA" em qualquer parte do nome
+Case-insensitive: Encontra "estrutura", "ESTRUTURA", "Estrutura", etc.
+
+5. Filtro de Bancos
+FROM sys.databases 
+WHERE state = 0 
+  AND database_id > 4 
+  AND HAS_DBACCESS(name) = 1;
+Cada condição:
+
+state = 0: Apenas bancos online
+database_id > 4: Exclui bancos de sistema
+HAS_DBACCESS(name) = 1: Apenas bancos acessíveis
+
+6. Adição da Ordenação
+IF @SQL <> ''
+    SET @SQL = @SQL + ' ORDER BY DATABASE_NAME, TABLE_NAME, ORDINAL_POSITION;';
+Lógica:
+
+Verifica se construiu algum SQL
+Adiciona ordenação por: Banco → Tabela → Posição da Coluna
+Uma única ordenação para todo o resultado unificado
+
+7. Execução Condicional
+IF @SQL <> ''
+    EXEC sp_executesql @SQL
+ELSE
+    PRINT 'Nenhum banco acessível encontrado.';
+Tratamento:
+
+Se há SQL: Executa a consulta
+Se não há bancos: Informa que nenhum banco foi encontrado
+
+*/
